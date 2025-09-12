@@ -91,6 +91,9 @@ Section Specification.
       Definition AngelicEquivalence (R : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
         forall input P, mr input P <-> (exists output, R input output /\ P output). 
 
+      Definition AngelicImplication (R : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
+        forall input P, mr input P -> (exists output, R input output /\ P output). 
+
       Definition ofAngelic (r : MultiRelationSpec IT OT) : RelationSpec IT OT :=
         (* fun input output => ((forall P, r input P -> (P output -> False)) -> False). *)
         (* fun input output => ((forall P, ((r input P) -> False) -> (P output -> False) )). *)
@@ -127,8 +130,11 @@ Section Specification.
       Lemma toDemonicIsDemonic r : demonic (toDemonic r).
       Proof. repeat split; try firstorder. cbv. intros.  eexists (fun _ => True). eauto. Qed.
 
-      Definition DemonicEquivalence (r : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
-        forall input P, mr input P <-> (forall output, r input output -> P output).
+      Definition DemonicEquivalence (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
+        forall input P, MR input P <-> (forall output, R input output -> P output).
+
+      Definition DemonicImplication (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
+        forall input P, MR input P -> (forall output, R input output -> P output).
 
       Definition ofDemonic (r : MultiRelationSpec IT OT) : RelationSpec IT OT :=
         fun input output => (forall P, r input P -> P output).
@@ -147,14 +153,17 @@ Section Specification.
     (* family of total multiplicative up-closed binary multirelations *)
     Section TotalNondeterminism.
 
-      Definition toTotal (r : RelationSpec IT OT) : MultiRelationSpec IT OT :=
-        fun input P => (forall output, r input output -> P output) /\ (exists output, r input output).
+      Definition toTotal (R : RelationSpec IT OT) : MultiRelationSpec IT OT :=
+        fun input P => (forall output, R input output -> P output) /\ (exists output, R input output).
 
-      Lemma toTotalIsTotal r : totalic (toTotal r).
+      Lemma toTotalIsTotal R : totalic (toTotal R).
       Proof. repeat split; try firstorder. Qed.
 
-      Definition TotalicEquivalence (r : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
-        forall input P, mr input P <-> ((forall output, r input output -> P output) /\ (exists output, r input output)).
+      Definition TotalicEquivalence (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
+        forall input P, MR input P <-> ((forall output, R input output -> P output) /\ (exists output, R input output)).
+
+      Definition TotalicImplication (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
+        forall input P, MR input P -> ((forall output, R input output -> P output) /\ (exists output, R input output)).
 
       Definition ofTotal (r : MultiRelationSpec IT OT) : RelationSpec IT OT :=
         fun input output => (forall P, r input P -> P output) /\ (exists P, r input P).
@@ -556,14 +565,13 @@ Section Specification.
     Proof. firstorder. Qed.
 
   End Composition.
-(* 
-  Section Composition.
+
+  (* Section Composition.
     Context {IT MT NT OT : Type}.
     Context (R : MultiRelationSpec MT NT).
     Context (f : IT -> MT).
     Context (g : MT -> NT -> OT).
 
-    CONT
 
     (* Lemma composition_associative {s P} : 
       R s P <-> (composition identity R) s P.
@@ -612,3 +620,170 @@ Global Hint Resolve
   gcomposition_totalic
   hcomposition_totalic
   : totalic.
+
+
+(* Section Refinement.
+  Context {IT ST : Type}.
+
+  Context {IRSpec : RelationSpec IT IT}.
+  Context {SRSpec : RelationSpec ST ST}.
+
+  Context {R : RelationSpec IT ST}.
+
+  Definition RelationalRefines := forall s t, 
+    R s t -> 
+    forall s', 
+    IRSpec s s' -> 
+    exists t', 
+    SRSpec t t' /\ 
+    R s' t'.
+
+  Context {IMRSpec : MultiRelationSpec IT IT}.
+  Context {SMRSpec : MultiRelationSpec ST ST}.
+
+  Context {DI : DemonicImplication IRSpec IMRSpec}.
+  Context {AI : AngelicImplication SRSpec SMRSpec}.
+
+  Definition CompositionalMultiRelationalRefines := 
+    forall s t,
+    R s t -> 
+    IMRSpec s (fun s' => SMRSpec t (R s')).
+
+  Lemma Compositional_MultiRelation_Relation_Refines :
+    CompositionalMultiRelationalRefines -> RelationalRefines.
+  Proof. firstorder. Qed.
+End Refinement. *)
+
+
+Section Refinement.
+  Context {IT ST : Type}.
+
+  Context {IRSpec : RelationSpec IT IT}.
+  Context {SRSpec : RelationSpec ST ST}.
+
+  Context {R : RelationSpec IT ST}.
+
+  Definition RelationalRefines := forall s t, 
+    R s t -> 
+    forall s', 
+    IRSpec s s' -> 
+    exists t', 
+    SRSpec t t' /\ 
+    R s' t'.
+
+  Context {IMRSpec : MultiRelationSpec IT IT}.
+  Context {SMRSpec : MultiRelationSpec ST ST}.
+
+  Context {MR : MultiRelationSpec IT ST}.
+
+  Context {UCI : upclosed IMRSpec}.
+  Context {DI : DemonicEquivalence IRSpec IMRSpec}.
+  Context {AI : AngelicImplication SRSpec SMRSpec}.
+
+  Context {DIMR : TotalicEquivalence R MR}.
+
+
+  (* Context {  }. *)
+
+  (* Definition ImplicationalMultiRelationalRefines := 
+    forall s t SP,
+    R s t -> 
+    SMRSpec t SP -> 
+    IMRSpec s (fun s' => exists t', R s' t' /\ SP t'). *)
+    (* IMRSpec s (fun s' => exists t', R s' t' /\ SP t'). *)
+
+  (* Definition ImplicationalMultiRelationalRefines := 
+    forall s ,
+    MR s (fun t => 
+      forall SP,
+      SMRSpec t SP -> 
+      IMRSpec s (fun s' => MR s' SP)). *)
+
+  Definition ImplicationalMultiRelationalRefines := 
+    forall s ,
+    forall SP,
+      IMRSpec s (fun s' => MR s' SP) -> 
+      MR s (fun t => 
+          SMRSpec t SP 
+        ).
+
+
+  (* Definition ImplicationalMultiRelationalRefines := 
+    forall t,
+    MR t (fun s => 
+      forall IP,
+      IMRSpec s IP -> 
+      SMRSpec t (fun t' => MR t' IP) 
+      ). *)
+
+  (* Definition ImplicationalMultiRelationalRefines := 
+  forall t,
+  MR t (fun s => 
+    forall IP,
+    IMRSpec s IP -> 
+    SMRSpec t (fun t' => MR t' IP) 
+    ).
+     *)
+
+  Lemma Implicational_MultiRelation_Relation_Refines :
+    ImplicationalMultiRelationalRefines -> RelationalRefines.
+  Proof. cbv. firstorder.
+    specialize (H s). 
+
+    (* specialize (DIMR _ _ H). *)
+    eapply DIMR in H; eauto.
+    (* firstorder. *)
+    (* specialize (H _ H0). *)
+    eapply AI.
+    firstorder.
+    eapply H; eauto.
+    eapply DI.
+    firstorder.
+    eapply DI in H1.
+    eapply 
+
+
+    eapply H.
+    cbv in *.
+    (* erewrite <- DI in H1. *)
+    (* cbv in *. *)
+    (* cbv in DI. *)
+    (* eapply DI in H1. *)
+    eapply DI.
+    eapply H2; eauto.
+
+
+    (* cbv in *.
+    eapply UCI. *)
+    eapply DI; eauto.
+
+    eapply DI; eauto.
+
+
+
+
+    eapply UCI. [ | eassumption ].
+
+
+
+    eapply DI in H1.
+    2: { 
+      eapply H.
+    }
+    
+    in H0.
+  Qed.
+End Refinement.
+
+
+
+    Definition ImplicationalMultiRelationalRefines := forall s t,
+    R s t -> 
+    IMRSpec s (fun s' => SMRSpec t (fun t' => R s' t')).
+
+  Lemma Compositional_MultiRelation_Relation_Refines :
+    MultiRelationalRefines -> RelationalRefines.
+  Proof. firstorder. Qed.
+  
+  
+
