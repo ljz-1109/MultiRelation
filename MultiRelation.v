@@ -91,6 +91,11 @@ Section Specification.
       Definition AngelicEquivalence (R : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
         forall input P, mr input P <-> (exists output, R input output /\ P output). 
 
+      Lemma AngelicEquivalenceIsAngelic R MR : 
+        AngelicEquivalence R MR -> 
+        angelic MR.
+      Proof. intros. eapply angelic_extensionality with (R := toAngelic R); try firstorder. Qed.
+
       Definition AngelicImplication (R : RelationSpec IT OT) (mr : MultiRelationSpec IT OT) : Prop := 
         forall input P, mr input P -> (exists output, R input output /\ P output). 
 
@@ -133,6 +138,11 @@ Section Specification.
       Definition DemonicEquivalence (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
         forall input P, MR input P <-> (forall output, R input output -> P output).
 
+      Lemma DemonicEquivalenceIsDemonic R MR : 
+        DemonicEquivalence R MR -> 
+        demonic MR.
+      Proof. intros. eapply demonic_extensionality with (R := toDemonic R); try firstorder. eapply toDemonicIsDemonic. Qed.
+
       Definition DemonicImplication (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
         forall input P, MR input P -> (forall output, R input output -> P output).
 
@@ -153,30 +163,35 @@ Section Specification.
     (* family of total multiplicative up-closed binary multirelations *)
     Section TotalNondeterminism.
 
-      Definition toTotal (R : RelationSpec IT OT) : MultiRelationSpec IT OT :=
+      Definition toTotalic (R : RelationSpec IT OT) : MultiRelationSpec IT OT :=
         fun input P => (forall output, R input output -> P output) /\ (exists output, R input output).
 
-      Lemma toTotalIsTotal R : totalic (toTotal R).
+      Lemma toTotalIsTotal R : totalic (toTotalic R).
       Proof. repeat split; try firstorder. Qed.
 
       Definition TotalicEquivalence (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
         forall input P, MR input P <-> ((forall output, R input output -> P output) /\ (exists output, R input output)).
 
+      Lemma TotalicEquivalenceIsTotalic R MR : 
+        TotalicEquivalence R MR -> 
+        totalic MR.
+      Proof. intros. eapply totalic_extensionality with (R := toTotalic R); firstorder. Qed.
+
       Definition TotalicImplication (R : RelationSpec IT OT) (MR : MultiRelationSpec IT OT) : Prop := 
         forall input P, MR input P -> ((forall output, R input output -> P output) /\ (exists output, R input output)).
 
-      Definition ofTotal (r : MultiRelationSpec IT OT) : RelationSpec IT OT :=
+      Definition ofTotalic (r : MultiRelationSpec IT OT) : RelationSpec IT OT :=
         fun input output => (forall P, r input P -> P output) /\ (exists P, r input P).
 
-      Lemma toTotal_ofTotal (R : RelationSpec IT OT) : forall input output, 
-        ofTotal (toTotal R) input output <-> R input output.
+      Lemma toTotalic_ofTotalic (R : RelationSpec IT OT) : forall input output, 
+        ofTotalic (toTotalic R) input output <-> R input output.
       Proof. intros. cbv. firstorder.   specialize (H (fun x => R input x ) ). cbn in *. eapply H. firstorder. 
         exists (fun x => R input x). firstorder.
       Qed.
 
-      Lemma ofTotal_toTotal (R : MultiRelationSpec IT OT) : forall input P, 
+      Lemma ofTotalic_toTotalic (R : MultiRelationSpec IT OT) : forall input P, 
         totalic R -> 
-        (toTotal (ofTotal R) input P <-> R input P).
+        (toTotalic (ofTotalic R) input P <-> R input P).
       Proof. intros. firstorder; pose proof (multiplicative3 _ H H0). cbv in *. 
         eapply H.
         eapply H2.
@@ -654,7 +669,6 @@ Global Hint Resolve
   Proof. firstorder. Qed.
 End Refinement. *)
 
-
 Section Refinement.
   Context {IT ST : Type}.
 
@@ -678,19 +692,26 @@ Section Refinement.
 
   Context {UCI : upclosed IMRSpec}.
   Context {DI : DemonicEquivalence IRSpec IMRSpec}.
-  Context {AI : AngelicImplication SRSpec SMRSpec}.
+  Context {AI : AngelicEquivalence SRSpec SMRSpec}.
 
-  Context {DIMR : TotalicEquivalence R MR}.
+  Context {DIMR : TotalicImplication R MR}.
 
 
   (* Context {  }. *)
 
-  (* Definition ImplicationalMultiRelationalRefines := 
+    (* Definition ImplicationalMultiRelationalRefines := 
     forall s t SP,
     R s t -> 
     SMRSpec t SP -> 
-    IMRSpec s (fun s' => exists t', R s' t' /\ SP t'). *)
-    (* IMRSpec s (fun s' => exists t', R s' t' /\ SP t'). *)
+    IMRSpec s (fun s' => exists t', SP t' /\ R s' t'  ). *)
+
+  Definition ImplicationalMultiRelationalRefines := 
+    forall s,
+    MR s (fun t => 
+      forall SP,
+      SMRSpec t SP -> 
+      IMRSpec s (fun s' => MR s' SP)).
+    (* IMRSpec s (fun s' => exists t', SP t' /\ R s' t'  ). *)
 
   (* Definition ImplicationalMultiRelationalRefines := 
     forall s ,
@@ -699,13 +720,11 @@ Section Refinement.
       SMRSpec t SP -> 
       IMRSpec s (fun s' => MR s' SP)). *)
 
-  Definition ImplicationalMultiRelationalRefines := 
+  (* Definition ImplicationalMultiRelationalRefines := 
     forall s ,
     forall SP,
-      IMRSpec s (fun s' => MR s' SP) -> 
-      MR s (fun t => 
-          SMRSpec t SP 
-        ).
+      MR s (fun t => SMRSpec t SP) -> 
+      IMRSpec s (fun s' => MR s' SP).  *)
 
 
   (* Definition ImplicationalMultiRelationalRefines := 
@@ -727,8 +746,30 @@ Section Refinement.
 
   Lemma Implicational_MultiRelation_Relation_Refines :
     ImplicationalMultiRelationalRefines -> RelationalRefines.
-  Proof. cbv. firstorder.
-    specialize (H s). 
+  Proof. cbv.
+    intros.
+    epose proof (H s).
+    eapply DIMR in H2. destruct H2 as [? _].
+    epose proof (H2 _ H0 (fun t' => SRSpec t t')). cbn in *.
+
+    (* epose proof (H _ _ (fun t' => SRSpec t t') H0). cbn in *. *)
+
+
+    generalize dependent s'.
+    eapply DI; try eassumption.
+    epose proof (DemonicEquivalenceIsDemonic _ _ DI). destruct H1 as [? _].
+    eapply H1; [ | eapply H3]; try firstorder.
+
+    
+    2: try eassumption. try eassumption; try firstorder.
+    2:{
+      eapply H3. eapply AI. admit.
+    }
+    cbn. intros. firstorder.
+    eapply H; eauto.
+    eapply AI. eauto.
+
+    specialize (H _ _ _ H0). 
 
     (* specialize (DIMR _ _ H). *)
     eapply DIMR in H; eauto.
