@@ -220,6 +220,26 @@ Section Specification.
 
     End TotalNondeterminism.
 
+    Section Nondeterminism.
+
+      Context {R : RelationSpec IT OT}.
+
+      Lemma MultiRelationEquivalence {s P} :
+        (toAngelic R s P /\ toDemonic R s P) <-> (toTotalic R s P).
+      Proof. firstorder. Qed.
+
+      Lemma DemonicImpliesAngelic :
+        (forall s P, (toDemonic R s P) -> (toAngelic R s P)) <-> 
+        (forall s, exists t, R s t) (* Total *).
+      Proof. cbv. firstorder. epose proof (H s (fun t => R s t)). firstorder. Qed.
+
+      Lemma AngelicImpliesDemonic :
+        (forall s P, (toAngelic R s P) -> (toDemonic R s P)) <-> 
+        (forall s t t', R s t -> R s t' -> t = t') (* Univalent/Functional *).
+      Proof. cbv. firstorder. epose proof (H s (fun t => t' = t)). firstorder. erewrite H; try eassumption. Qed.
+
+    End Nondeterminism.
+
   End MultiRelation.
 
   Section Identity.
@@ -656,8 +676,8 @@ Global Hint Resolve
   Context {IMRSpec : MultiRelationSpec IT IT}.
   Context {SMRSpec : MultiRelationSpec ST ST}.
 
-  Context {DI : DemonicImplication IRSpec IMRSpec}.
-  Context {AI : AngelicImplication SRSpec SMRSpec}.
+  Context {DI : DemonicEquivalence IRSpec IMRSpec}.
+  Context {AI : AngelicEquivalence SRSpec SMRSpec}.
 
   Definition CompositionalMultiRelationalRefines := 
     forall s t,
@@ -665,36 +685,135 @@ Global Hint Resolve
     IMRSpec s (fun s' => SMRSpec t (R s')).
 
   Lemma Compositional_MultiRelation_Relation_Refines :
-    CompositionalMultiRelationalRefines -> RelationalRefines.
-  Proof. firstorder. Qed.
+    CompositionalMultiRelationalRefines <-> RelationalRefines.
+  Proof. 
+    split. 
+    intros. intros ?; intros. eapply AI. generalize dependent s'. eapply DI; try eassumption. eauto.
+    intros. intros ?; intros. eapply DI. intros. eapply AI. eauto.
+  Qed.
+
 End Refinement. *)
 
 Section Refinement.
-  Context {IT ST : Type}.
+  Context {XI YI XS YS : Type}.
 
-  Context {IRSpec : RelationSpec IT IT}.
-  Context {SRSpec : RelationSpec ST ST}.
+  Context {IRSpec : RelationSpec XI YI}.
+  Context {SRSpec : RelationSpec XS YS}.
 
-  Context {R : RelationSpec IT ST}.
+  Context {XR : RelationSpec XS XI}.
+  Context {YR : RelationSpec YI YS}.
 
   Definition RelationalRefines := forall s t, 
-    R s t -> 
+    XR t s -> 
     forall s', 
     IRSpec s s' -> 
     exists t', 
     SRSpec t t' /\ 
-    R s' t'.
+    YR s' t'.
 
-  Context {IMRSpec : MultiRelationSpec IT IT}.
-  Context {SMRSpec : MultiRelationSpec ST ST}.
+  (* Implementation  *)
+  Context {IMRSpec : MultiRelationSpec XI YI}.
+  (* Specification  *)
+  Context {SMRSpec : MultiRelationSpec XS YS}.
 
-  Context {MR : MultiRelationSpec IT ST}.
+  (* Precondition *)
+  Context {XMR : MultiRelationSpec XS XI}.
+  (* Postcondition *)
+  Context {YMR : MultiRelationSpec YI YS}.
 
-  Context {UCI : upclosed IMRSpec}.
-  Context {DI : DemonicEquivalence IRSpec IMRSpec}.
-  Context {AI : AngelicEquivalence SRSpec SMRSpec}.
+  Context {IDI : DemonicEquivalence IRSpec IMRSpec}.
+  Context {SAI : DemonicEquivalence SRSpec SMRSpec}.
 
-  Context {DIMR : TotalicImplication R MR}.
+  Context {XDI : DemonicEquivalence XR XMR}.
+  Context {YAI : AngelicEquivalence YR YMR}.
+
+
+  (* Context {  }. *)
+
+    (* Definition ImplicationalMultiRelationalRefines := 
+    forall s t SP,
+    R s t -> 
+    SMRSpec t SP -> 
+    IMRSpec s (fun s' => exists t', SP t' /\ R s' t'  ). *)
+
+  Definition ImplicationalMultiRelationalRefines := 
+    (* forall s,
+    XMR s (fun t => 
+      forall SP,
+      SMRSpec t SP -> 
+      IMRSpec s (fun s' => YMR s' SP)). *)
+
+    forall t SP,
+    SMRSpec t SP -> 
+    XMR t (fun s => 
+      IMRSpec s (fun s' => 
+        YMR s' SP
+      )
+    ).
+
+
+  Lemma Implicational_MultiRelation_Relation_Refines :
+    ImplicationalMultiRelationalRefines -> RelationalRefines.
+  Proof. cbv.
+    intros.
+    epose proof (H t).
+    (* eapply XDI in H2; try eassumption.  *)
+    (* epose proof (H2 (fun t' => SRSpec t t')). cbn in *. *)
+    assert (forall A (P Q : A -> Prop), (exists a , P a /\ Q a) -> (exists a , Q a /\ P a)) as ConjComm by firstorder; eapply ConjComm; clear ConjComm.
+    eapply YAI.
+
+
+    (* eapply SAI. *)
+
+    (* epose proof (H _ _ (fun t' => SRSpec t t') H0). cbn in *. *)
+
+
+    generalize dependent s'.
+    eapply IDI; try eassumption.
+    generalize dependent s.
+    eapply XDI; try eassumption.
+    eapply H2; try eassumption.
+
+    eapply SAI. eauto.
+    (* epose proof (DemonicEquivalenceIsDemonic _ _ IDI). destruct H1 as [? _]. *)
+    eapply H1; [ | eapply H3]; try firstorder.
+
+
+    
+End Refinement.
+
+Section Refinement.
+  Context {XI YI XS YS : Type}.
+
+  Context {IRSpec : RelationSpec XI YI}.
+  Context {SRSpec : RelationSpec XS YS}.
+
+  Context {XR : RelationSpec XI XS}.
+  Context {YR : RelationSpec YI YS}.
+
+  Definition RelationalRefines := forall s t, 
+    XR s t -> 
+    forall s', 
+    IRSpec s s' -> 
+    exists t', 
+    SRSpec t t' /\ 
+    YR s' t'.
+
+  (* Implementation  *)
+  Context {IMRSpec : MultiRelationSpec XI YI}.
+  (* Specification  *)
+  Context {SMRSpec : MultiRelationSpec XS YS}.
+
+  (* Precondition *)
+  Context {XMR : MultiRelationSpec XI XS}.
+  (* Postcondition *)
+  Context {YMR : MultiRelationSpec YI YS}.
+
+  Context {IDI : DemonicEquivalence IRSpec IMRSpec}.
+  Context {SAI : DemonicEquivalence SRSpec SMRSpec}.
+
+  Context {XDI : DemonicEquivalence XR XMR}.
+  Context {YAI : AngelicEquivalence YR YMR}.
 
 
   (* Context {  }. *)
@@ -707,10 +826,10 @@ Section Refinement.
 
   Definition ImplicationalMultiRelationalRefines := 
     forall s,
-    MR s (fun t => 
+    XMR s (fun t => 
       forall SP,
       SMRSpec t SP -> 
-      IMRSpec s (fun s' => MR s' SP)).
+      IMRSpec s (fun s' => YMR s' SP)).
     (* IMRSpec s (fun s' => exists t', SP t' /\ R s' t'  ). *)
 
   (* Definition ImplicationalMultiRelationalRefines := 
@@ -745,75 +864,58 @@ Section Refinement.
      *)
 
   Lemma Implicational_MultiRelation_Relation_Refines :
-    ImplicationalMultiRelationalRefines -> RelationalRefines.
+    RelationalRefines -> ImplicationalMultiRelationalRefines.
   Proof. cbv.
     intros.
     epose proof (H s).
-    eapply DIMR in H2. destruct H2 as [? _].
-    epose proof (H2 _ H0 (fun t' => SRSpec t t')). cbn in *.
+    eapply XDI. intros.
+    eapply IDI.
+    intros.
+    eapply YAI.
+    eapply H0 in H3; try eassumption.
+    firstorder.
+    eapply XDI in H2; try eassumption. 
+    epose proof (H2 (fun t' => SRSpec t t')). cbn in *.
+    assert (forall A (P Q : A -> Prop), (exists a , P a /\ Q a) -> (exists a , Q a /\ P a)) as ConjComm by firstorder; eapply ConjComm; clear ConjComm.
+    eapply YAI.
+
+
+    (* eapply SAI. *)
 
     (* epose proof (H _ _ (fun t' => SRSpec t t') H0). cbn in *. *)
 
 
     generalize dependent s'.
-    eapply DI; try eassumption.
-    epose proof (DemonicEquivalenceIsDemonic _ _ DI). destruct H1 as [? _].
+    eapply IDI; try eassumption.
+    eapply H2; try eassumption.
+
+    eapply SAI. eauto.
+
+  Lemma Implicational_MultiRelation_Relation_Refines :
+    ImplicationalMultiRelationalRefines -> RelationalRefines.
+  Proof. cbv.
+    intros.
+    epose proof (H s).
+    eapply XDI in H2; try eassumption. 
+    epose proof (H2 (fun t' => SRSpec t t')). cbn in *.
+    assert (forall A (P Q : A -> Prop), (exists a , P a /\ Q a) -> (exists a , Q a /\ P a)) as ConjComm by firstorder; eapply ConjComm; clear ConjComm.
+    eapply YAI.
+
+
+    (* eapply SAI. *)
+
+    (* epose proof (H _ _ (fun t' => SRSpec t t') H0). cbn in *. *)
+
+
+    generalize dependent s'.
+    eapply IDI; try eassumption.
+    eapply H2; try eassumption.
+
+    eapply SAI. eauto.
+    (* epose proof (DemonicEquivalenceIsDemonic _ _ IDI). destruct H1 as [? _]. *)
     eapply H1; [ | eapply H3]; try firstorder.
 
     
-    2: try eassumption. try eassumption; try firstorder.
-    2:{
-      eapply H3. eapply AI. admit.
-    }
-    cbn. intros. firstorder.
-    eapply H; eauto.
-    eapply AI. eauto.
-
-    specialize (H _ _ _ H0). 
-
-    (* specialize (DIMR _ _ H). *)
-    eapply DIMR in H; eauto.
-    (* firstorder. *)
-    (* specialize (H _ H0). *)
-    eapply AI.
-    firstorder.
-    eapply H; eauto.
-    eapply DI.
-    firstorder.
-    eapply DI in H1.
-    eapply 
-
-
-    eapply H.
-    cbv in *.
-    (* erewrite <- DI in H1. *)
-    (* cbv in *. *)
-    (* cbv in DI. *)
-    (* eapply DI in H1. *)
-    eapply DI.
-    eapply H2; eauto.
-
-
-    (* cbv in *.
-    eapply UCI. *)
-    eapply DI; eauto.
-
-    eapply DI; eauto.
-
-
-
-
-    eapply UCI. [ | eassumption ].
-
-
-
-    eapply DI in H1.
-    2: { 
-      eapply H.
-    }
-    
-    in H0.
-  Qed.
 End Refinement.
 
 
