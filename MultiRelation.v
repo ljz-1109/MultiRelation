@@ -242,6 +242,134 @@ Section Specification.
 
   End MultiRelation.
 
+  Section Trace. 
+
+    (* Context {T : Type}. *)
+
+    CoInductive trace {T : Type} : Type :=
+    | cons_trace : T -> trace -> trace.
+
+    Arguments trace : clear implicits.
+
+    Definition strongest_post_transform {T : Type} (wp : MultiRelationSpec T T) : MultiRelationSpec T T.
+
+      intros x P.
+      refine (forall Q t, P t -> wp t Q -> Q x).
+    Defined.
+
+    (* Lemma strongest_post_transform_complete {T} : forall wp  P Q,
+      (forall s, (strongest_post_transform wp s P) -> Q s) -> (forall (t : T), P t -> wp t Q).
+    Proof.
+      cbv. firstorder. eapply H.
+    Qed. *)
+
+    (* Lemma strongest_post_transform_sound {T} : forall wp  P Q,
+      (forall (t : T), P t -> wp t Q) -> (forall s, (strongest_post_transform wp s P) -> Q s).
+    Proof.
+      cbv. firstorder. eapply H0.
+    Qed. *)
+
+
+
+    (* Definition progress {T : Type} (mr : MultiRelationSpec T T) : 
+
+      ((T -> Prop)) -> ((T -> Prop)).
+      refine (
+        fun init final => mr final init
+      ).
+      cbv in *.
+      refine (init (fun t => mr t final)).
+    Defined. *)
+
+    Definition wp_inclusion {T} (sub super : MultiRelationSpec T T) : Prop.
+      refine (forall t P, super t P -> sub t P ).
+    Defined.
+
+    Definition progress {T : Type} (mr : MultiRelationSpec T T) : 
+
+      ((T -> Prop) -> Prop) -> ((T -> Prop) -> Prop).
+      refine (
+        fun init final => _
+      ).
+      cbv in *.
+      refine (init (fun t => mr t final)).
+    Defined.
+
+    Definition inclusion {T : Type} (sub super : ((T -> Prop) -> Prop)) : Prop.
+      refine (
+        forall P, (sub (P)) -> (super (P))
+      ).
+    Defined.
+
+    Lemma progress_inclusion {T : Type} (mr mr' : MultiRelationSpec T T) : 
+      forall (init init' : ((T -> Prop) -> Prop)),
+      inclusion init init' -> 
+      wp_inclusion mr mr' -> 
+      inclusion (progress mr init) (progress mr' init').
+    Proof.
+      cbv. firstorder.
+      eapply H.
+      specialize (H0 _ (fun t => init (fun t' => mr' t')))
+      eapply H0.
+
+
+    CoInductive trace_inclusion {T : Type} : forall (t t' : trace ((T -> Prop) -> Prop)), Prop :=
+    | cons_trace_inclusion :
+      forall P Q, 
+      inclusion P Q -> 
+      forall t t',
+      trace_inclusion t t' -> 
+      trace_inclusion (cons_trace P t) (cons_trace Q t').
+
+    CoFixpoint progressing_trace {T : Type} (init : ((T -> Prop) -> Prop)) (mr : MultiRelationSpec T T) : trace ((T -> Prop) -> Prop).
+      refine (cons_trace init (progressing_trace _ (progress mr init) mr)).
+    Defined.
+
+    (* Lemma repeat_equal A : forall (n : A), 
+      repeatc n = Cons _ n (repeatc n).
+    Proof.
+      intro n.
+      cofix H'.
+      simpl.
+      f_equal.
+      exact H.
+    Qed. *)
+
+    (* Print trace_inclusion_ind. *)
+
+
+    CoFixpoint wp_inclusion_implies_trace_inclusion {T : Type} : 
+      forall (sub super : MultiRelationSpec T T)
+      (init init' : ((T -> Prop) -> Prop)),
+      inclusion init init' ->
+      wp_inclusion sub super -> 
+      trace_inclusion (progressing_trace init sub) (progressing_trace init' super).
+    Proof.
+      CONT: 
+
+      cofix H'. 
+
+      specialize (H' (progressing_trace ))
+       
+       cbn in *.
+      cbv [progressing_trace].
+      eapply cons_trace_inclusion.
+
+      intros.
+      cofix H'.
+      intros. eauto.
+    Qed.
+      cbv.
+      econstructor.
+
+
+
+      
+
+
+
+  End Trace.
+
   Section Identity.
 
     Context {T : Type}.
@@ -694,6 +822,79 @@ Global Hint Resolve
 
 End Refinement. *)
 
+
+
+Section Refinement.
+  Context {XI YI XS YS : Type}.
+
+  Context {IMRSpec : MultiRelationSpec XI YI}.
+  (* Specification  *)
+  Context {SMRSpec : MultiRelationSpec XS YS}.
+
+  (* Precondition *)
+  Context {XMR : MultiRelationSpec XS XI}.
+  (* Postcondition *)
+  Context {YMR : MultiRelationSpec YI YS}.
+
+  (* Context {IDI : DemonicImplication IRSpec IMRSpec}.
+  Context {SAI : DemonicImplication SRSpec SMRSpec}. *)
+
+  (* Context {XDI : DemonicEquivalence XR XMR}.
+  Context {YAI : AngelicEquivalence YR YMR}. *)
+
+  Context {XR : RelationSpec XS XI}.
+  Context {YR : RelationSpec YI YS}.
+
+  
+  (* Context {  }. *)
+  Definition ImplicationalMultiRelationalRefines := 
+    forall s t SP,
+    XR t s -> 
+    SMRSpec t SP -> 
+    IMRSpec s (fun s' => exists t', SP t' /\ YR s' t'  ).
+
+  Notation IRSpec := (ofDemonic IMRSpec).
+  Notation SRSpec := (ofAngelic SMRSpec).
+
+  (* Context {IRSpec : RelationSpec XI YI}.
+  Context {SRSpec : RelationSpec XS YS}.
+
+  Context {XR : RelationSpec XS XI}.
+  Context {YR : RelationSpec YI YS}. *)
+
+  Definition RelationalRefines := forall s t, 
+    XR t s -> 
+    forall s', 
+    IRSpec s s' -> 
+    exists t', 
+    SRSpec t t' /\ 
+    YR s' t'.
+
+  
+  Lemma Implicational_MultiRelation_Relation_Refines :
+    ImplicationalMultiRelationalRefines -> RelationalRefines.
+  Proof. 
+  
+    cbv in *.
+    firstorder. eapply H1.
+    eapply H; eauto.
+    epose proof (IDI _ (fun s => exists t' : YS, SRSpec t t' /\ YR s t')). eapply H2.
+    all : eauto. eapply H; eauto. firstorder.
+    eapply SAI; firstorder.
+
+    assert (SRSpec = ofDemonic SMRSpec) by admit.
+    erewrite H3. cbv.
+    assert (totalic SMRSpec) by admit.
+    cbv in H4; firstorder.
+    eapply H6; eauto.
+
+    eapply IDI in H1. eassumption.
+    
+    eauto.
+
+    eapply 
+
+
 Section Refinement.
   Context {XI YI XS YS : Type}.
 
@@ -814,6 +1015,13 @@ Section Refinement.
 
   Context {XDI : DemonicEquivalence XR XMR}.
   Context {YAI : AngelicEquivalence YR YMR}.
+
+
+    Definition ImplicationalMultiRelationalRefines := 
+    forall s t SP,
+    XR t s -> 
+    SMRSpec t SP -> 
+    IMRSpec s (fun s' => exists t', SP t' /\ YR s' t'  ).
 
 
   (* Context {  }. *)
